@@ -1,0 +1,23 @@
+# Secretos locales
+.env
+
+# Java / Maven
+target/
+*.class
+*.log
+hs_err_pid*
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+
+# Node (servicios futuros)
+node_modules/
+dist/
+coverage/
+
+# Sistema
+.DS_Store
+Thumbs.db
