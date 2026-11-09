@@ -75,6 +75,7 @@ public class AccountJpaEntity {
     BigDecimal getBalance() { return balance; }
     AccountStatusColumn getStatus() { return status; }
     Instant getCreatedAt() { return createdAt; }
+    long getVersion() { return version; }
 
     enum AccountStatusColumn { ACTIVE, CLOSED }
 }

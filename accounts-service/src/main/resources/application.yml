@@ -19,6 +19,12 @@ spring:
 server:
   port: 8081
 
+# Reglas de negocio configurables (sin recompilar).
+pagoseguro:
+  business-zone: America/Santiago
+  transfers:
+    daily-limit: 2000000.00   # CLP por cuenta y por día
+
 management:
   endpoints:
     web:

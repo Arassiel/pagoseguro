@@ -8,10 +8,12 @@ import cl.pagoseguro.accounts.domain.model.Rut;
 import cl.pagoseguro.accounts.domain.port.out.AccountRepositoryPort;
 import cl.pagoseguro.accounts.infrastructure.adapter.out.persistence.AccountJpaEntity.AccountStatusColumn;
 import org.springframework.data.domain.Sort;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -32,12 +34,25 @@ class AccountPersistenceAdapter implements AccountRepositoryPort {
     public Account save(Account account) {
         AccountJpaEntity entity = repository.findById(account.getId().value())
                 .map(existing -> {
+                    ensureSameVersion(existing, account);
                     existing.updateFrom(account.getHolderName(), account.getBalance().amount(),
                             toColumn(account.getStatus()));
                     return existing;
                 })
                 .orElseGet(() -> toEntity(account));
         return toDomain(repository.save(entity));
+    }
+
+    /**
+     * Bloqueo optimista, parte 1: si la versión que leyó el dominio ya no es la de la base,
+     * alguien modificó la cuenta entretanto y rechazamos el cambio.
+     * Parte 2 la hace Hibernate al confirmar: UPDATE ... WHERE id = ? AND version = ?
+     * Si ese UPDATE no afecta ninguna fila, también lanza ObjectOptimisticLockingFailureException.
+     */
+    private static void ensureSameVersion(AccountJpaEntity existing, Account account) {
+        if (!Objects.equals(account.getVersion(), existing.getVersion())) {
+            throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, existing.getId());
+        }
     }
 
     @Override
@@ -79,7 +94,8 @@ class AccountPersistenceAdapter implements AccountRepositoryPort {
                 entity.getHolderName(),
                 new Money(entity.getBalance()),
                 AccountStatus.valueOf(entity.getStatus().name()),
-                entity.getCreatedAt());
+                entity.getCreatedAt(),
+                entity.getVersion());
     }
 
     private static AccountStatusColumn toColumn(AccountStatus status) {

@@ -1,6 +1,7 @@
 package cl.pagoseguro.accounts.domain.model;
 
 import cl.pagoseguro.accounts.domain.exception.DomainException;
+import cl.pagoseguro.accounts.domain.exception.InsufficientFundsException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -53,12 +54,61 @@ class AccountTest {
     @Test
     void noSePuedeCerrarUnaCuentaConSaldo() {
         Account account = Account.restore(AccountId.newId(), "0012345678", RUT, "Franco",
-                Money.of("5000"), AccountStatus.ACTIVE, NOW);
+                Money.of("5000"), AccountStatus.ACTIVE, NOW, 0L);
 
         assertThatThrownBy(account::close)
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("saldo");
         assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+    }
+
+    @Test
+    void unDepositoAumentaElSaldo() {
+        Account account = Account.open("0012345678", RUT, "Franco", NOW);
+
+        account.deposit(Money.of("10000"));
+        account.deposit(Money.of("2500.50"));
+
+        assertThat(account.getBalance()).isEqualTo(Money.of("12500.50"));
+    }
+
+    @Test
+    void unRetiroDisminuyeElSaldo() {
+        Account account = Account.open("0012345678", RUT, "Franco", NOW);
+        account.deposit(Money.of("10000"));
+
+        account.withdraw(Money.of("10000"));
+
+        assertThat(account.getBalance().isZero()).isTrue();
+    }
+
+    @Test
+    void noSePuedeRetirarMasQueElSaldo() {
+        Account account = Account.open("0012345678", RUT, "Franco", NOW);
+        account.deposit(Money.of("10000"));
+
+        assertThatThrownBy(() -> account.withdraw(Money.of("10000.01")))
+                .isInstanceOf(InsufficientFundsException.class)
+                .hasMessageContaining("Saldo insuficiente");
+        assertThat(account.getBalance()).isEqualTo(Money.of("10000"));
+    }
+
+    @Test
+    void losMontosDebenSerMayoresACero() {
+        Account account = Account.open("0012345678", RUT, "Franco", NOW);
+
+        assertThatThrownBy(() -> account.deposit(Money.ZERO)).hasMessageContaining("mayor a cero");
+        assertThatThrownBy(() -> account.withdraw(Money.ZERO)).hasMessageContaining("mayor a cero");
+    }
+
+    @Test
+    void unaCuentaCerradaNoRecibeDepositos() {
+        Account account = Account.open("0012345678", RUT, "Franco", NOW);
+        account.close();
+
+        assertThatThrownBy(() -> account.deposit(Money.of("100")))
+                .isInstanceOf(DomainException.class)
+                .hasMessageContaining("no está activa");
     }
 
     @Test
